@@ -9,3 +9,6 @@ test-ledger
 proptest-regressions
 
 deploy.sh
+keys/cookie/
+keys/local/
+onchain.so

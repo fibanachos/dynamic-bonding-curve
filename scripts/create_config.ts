@@ -1,0 +1,163 @@
+import {
+  AnchorProvider,
+  Program,
+  Wallet,
+  BN,
+  setProvider,
+} from "@coral-xyz/anchor";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  clusterApiUrl,
+  SystemProgram,
+} from "@solana/web3.js";
+import { NATIVE_MINT } from "@solana/spl-token";
+import fs from "fs";
+import os from "os";
+import path from "path";
+
+import idl from "../target/idl/dynamic_bonding_curve.json";
+import type { DynamicBondingCurve } from "../target/types/dynamic_bonding_curve";
+import { designCurve } from "../tests/utils/create_curve";
+
+const PROGRAM_ID = new PublicKey(
+  "DBCg4ugDEztk6MbqHEJvx5a5YGJTj45Jb5NvtQ48Rvsf"
+);
+
+function loadKeypair(p: string): Keypair {
+  const expanded = p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
+  const raw = JSON.parse(fs.readFileSync(expanded, "utf8"));
+  return Keypair.fromSecretKey(Uint8Array.from(raw));
+}
+
+async function main() {
+  const RPC_URL = process.env.RPC_URL ?? "https://rpc.cookiescan.io";
+  const ADMIN_KEYPAIR_PATH =
+    process.env.ADMIN_KEYPAIR ?? "keys/local/upgrade-authority-live.json";
+  const QUOTE_MINT = process.env.QUOTE_MINT
+    ? new PublicKey(process.env.QUOTE_MINT)
+    : NATIVE_MINT;
+
+  const admin = loadKeypair(ADMIN_KEYPAIR_PATH);
+  const connection = new Connection(RPC_URL, "confirmed");
+  const provider = new AnchorProvider(connection, new Wallet(admin), {
+    commitment: "confirmed",
+  });
+  setProvider(provider);
+
+  const program = new Program<DynamicBondingCurve>(idl as any, provider);
+
+  // pump.fun-style defaults
+  const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens
+  const PCT_ON_MIGRATION = 20;        // 20% of supply parks in AMM at graduation; 80% sold on curve
+  const MIGRATION_QUOTE_THRESHOLD = 1_000_000; // 1M COOK
+  const MIGRATION_OPTION = 1;          // 0 = MeteoraDamm, 1 = DammV2
+  const TOKEN_BASE_DECIMAL = 6;
+  const TOKEN_QUOTE_DECIMAL = 9;
+  const CREATOR_TRADING_FEE_PCT = 50;  // 50% of trading fee to token creator
+  const COLLECT_FEE_MODE = 0;          // 0 = QuoteToken only
+
+  // Selects which pre-deployed DAMM v2 pool config receives migrated liquidity.
+  // Cookie Chain mapping (post-migration LP fee on the DAMM v2 pool):
+  //   0 = 0.25%  BgKTpMWBiSfdnxr8K6FmKsjV8LXpWZiS4a2xHk3M6Ymy
+  //   1 = 0.30%  EEy8EQ1PMrHSwV7FWWHkg9eHhkK8m9XbAnrUYNT4cEyW
+  //   2 = 1.00%  J3MPQDP4DBiyTfprAgYFkoKFxPEX6CsMVk1pWE18zdtu
+  //   3 = 2.00%  HLkFoomCC4BM2D3RecXkZ6winosu3JyYC6PXtzPUnJ99
+  //   4 = 4.00%  D4AK6wAwDmHk8Ty1uw9sRSDGhtDvg9EDh5KPy4mv1TC2
+  //   6 = Customizable  2Jw57QDN4ZymWyzEg418Db3udLH8a8fjaXCkbEVSsx1b
+  // pump.fun graduates with 0.25% LP fee → use option 0.
+  const MIGRATION_FEE_OPTION = 0;
+
+  const lockedVesting = {
+    amountPerPeriod: new BN(0),
+    cliffDurationFromMigrationTime: new BN(0),
+    frequency: new BN(0),
+    numberOfPeriod: new BN(0),
+    cliffUnlockAmount: new BN(0),
+  };
+
+  const migrationFee = {
+    feePercentage: 0,
+    creatorFeePercentage: 0,
+  };
+
+  const baseFeeOption = {
+    baseFeeMode: 0,
+    cliffFeeNumerator: new BN(10_000_000), // 1% (denom = 1e9)
+    firstFactor: 0,
+    secondFactor: new BN(0),
+    thirdFactor: new BN(0),
+  };
+
+  const instructionParams = designCurve(
+    TOTAL_SUPPLY,
+    PCT_ON_MIGRATION,
+    MIGRATION_QUOTE_THRESHOLD,
+    MIGRATION_OPTION,
+    TOKEN_BASE_DECIMAL,
+    TOKEN_QUOTE_DECIMAL,
+    CREATOR_TRADING_FEE_PCT,
+    COLLECT_FEE_MODE,
+    lockedVesting,
+    migrationFee,
+    { baseFeeOption }
+  );
+
+  instructionParams.migrationFeeOption = MIGRATION_FEE_OPTION;
+
+  if (instructionParams.migratedPoolMarketCapFeeSchedulerParams == null) {
+    instructionParams.migratedPoolMarketCapFeeSchedulerParams = {
+      numberOfPeriod: 0,
+      sqrtPriceStepBps: 0,
+      schedulerExpirationDuration: 0,
+      reductionFactor: new BN(0),
+    };
+  }
+
+  // Dynamic fee: caps at ~20% of base fee (0.2% on top of 1%) at max volatility.
+  // Constants mirror programs/.../constants.rs::dynamic_fee.
+  // variableFeeControl 956 derived from: target_max_numerator (base * 20%) * 1e11
+  //   / (maxVolatilityAccumulator * binStep)^2 = 2_000_000 * 1e11 / 14_460_000^2 ≈ 956.
+  instructionParams.poolFees.dynamicFee = {
+    binStep: 1,
+    binStepU128: new BN("1844674407370955"),
+    filterPeriod: 10,
+    decayPeriod: 120,
+    reductionFactor: 5000,
+    maxVolatilityAccumulator: 14_460_000,
+    variableFeeControl: 956,
+  };
+
+  const config = Keypair.generate();
+
+  console.log("Admin (payer / fee claimer / leftover receiver):", admin.publicKey.toBase58());
+  console.log("Quote mint:", QUOTE_MINT.toBase58());
+  console.log("New config pubkey:", config.publicKey.toBase58());
+
+  const sig = await program.methods
+    .createConfig({
+      ...instructionParams,
+      padding: new Array(2).fill(0),
+    } as any)
+    .accountsPartial({
+      config: config.publicKey,
+      feeClaimer: admin.publicKey,
+      leftoverReceiver: admin.publicKey,
+      quoteMint: QUOTE_MINT,
+      payer: admin.publicKey,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([admin, config])
+    .rpc();
+
+  console.log("Tx:", sig);
+  console.log("");
+  console.log("DBC_CONFIG =", config.publicKey.toBase58());
+  console.log("Paste this into cookieora/src/components/bonding/LaunchTokenPage.tsx");
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -1,5 +1,6 @@
+
 {
-  "address": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+  "address": "DAMMjDCEFTDkt7ywazZS8GoaLtjb3HaJo3pLbf64xrPY",
   "metadata": {
     "name": "cp_amm",
     "version": "0.2.0",
@@ -167,7 +168,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -306,7 +307,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -442,7 +443,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -692,7 +693,7 @@
         },
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "rent_receiver",
@@ -1205,7 +1206,7 @@
         },
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "payer",
@@ -1646,7 +1647,7 @@
         },
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -1926,7 +1927,7 @@
         },
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -2210,7 +2211,7 @@
         },
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -2422,7 +2423,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -2829,7 +2830,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -2978,7 +2979,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -3397,7 +3398,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -3538,7 +3539,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -3877,7 +3878,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",
@@ -3956,7 +3957,7 @@
       "accounts": [
         {
           "name": "pool_authority",
-          "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"
+          "address": "8WYfVSBcP3T1amRNmTnLfzYd44VDjGpw1jZxrEL8638o"
         },
         {
           "name": "pool",

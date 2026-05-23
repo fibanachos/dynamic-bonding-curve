@@ -28,7 +28,7 @@ pub mod tests;
 
 pub mod params;
 
-declare_id!("dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN");
+declare_id!("DBCg4ugDEztk6MbqHEJvx5a5YGJTj45Jb5NvtQ48Rvsf");
 
 #[program]
 pub mod dynamic_bonding_curve {
