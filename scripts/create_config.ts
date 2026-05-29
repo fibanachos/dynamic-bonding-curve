@@ -19,7 +19,7 @@ import path from "path";
 
 import idl from "../target/idl/dynamic_bonding_curve.json";
 import type { DynamicBondingCurve } from "../target/types/dynamic_bonding_curve";
-import { designCurve } from "../tests/utils/create_curve";
+import { designGraphCurve } from "../tests/utils/create_curve";
 
 const PROGRAM_ID = new PublicKey(
   "DBCg4ugDEztk6MbqHEJvx5a5YGJTj45Jb5NvtQ48Rvsf"
@@ -49,12 +49,32 @@ async function main() {
   const program = new Program<DynamicBondingCurve>(idl as any, provider);
 
   // pump.fun-style defaults
-  const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens
-  const PCT_ON_MIGRATION = 20;        // 20% of supply parks in AMM at graduation; 80% sold on curve
-  const MIGRATION_QUOTE_THRESHOLD = 1_000_000; // 1M COOK
+  const TOTAL_SUPPLY = 1_000_000_000; // curve math (1B)
+  // Bucket presets: each yields ~target COOK graduation with exact 1B supply (sim-verified).
+  // Override via `TARGET_GRAD_COOK=500000` env var. Default = 1M.
+  const GRAD_PRESETS: Record<number, { init: number; mig: number; k: number; leftOver: number }> = {
+    1_000_000: { init: 3_000, mig: 126_750_000, k: 1.05, leftOver: 1_000 }, // -> 999,714.9 COOK
+    500_000:   { init: 2_000, mig:  58_524_453, k: 1.04, leftOver: 1_000 }, // -> 499,999.9999 COOK
+    200_000:   { init:   300, mig:  70_727_256, k: 1.03, leftOver: 1_000 }, // -> 200,000.032 COOK
+    100_000:   { init:   150, mig:  35_363_627, k: 1.03, leftOver: 1_000 }, // -> 100,000.014 COOK
+    50_000:    { init:    80, mig:  13_613_226, k: 1.04, leftOver: 1_000 }, // -> 49,999.999 COOK
+    10_000:    { init:    30, mig:   1_268_185, k: 1.05, leftOver: 1_000 }, // -> 9,999.998 COOK
+  };
+  const TARGET_GRAD_COOK = Number(process.env.TARGET_GRAD_COOK ?? 1_000_000);
+  const preset = GRAD_PRESETS[TARGET_GRAD_COOK];
+  if (!preset) {
+    throw new Error(
+      `No preset for TARGET_GRAD_COOK=${TARGET_GRAD_COOK}. ` +
+      `Sim-verify a new param tuple first, then add it to GRAD_PRESETS.`
+    );
+  }
+  const MIGRATION_QUOTE_THRESHOLD = TARGET_GRAD_COOK; // target graduation quote (designGraphCurve ~matches)
   const MIGRATION_OPTION = 1;          // 0 = MeteoraDamm, 1 = DammV2
   const TOKEN_BASE_DECIMAL = 6;
   const TOKEN_QUOTE_DECIMAL = 9;
+  const FIXED_TOKEN_SUPPLY_RAW = new BN(1_000_000_000).mul(
+    new BN(10).pow(new BN(TOKEN_BASE_DECIMAL))
+  );
   const CREATOR_TRADING_FEE_PCT = 50;  // 50% of trading fee to token creator
   const COLLECT_FEE_MODE = 0;          // 0 = QuoteToken only
 
@@ -82,7 +102,7 @@ async function main() {
     creatorFeePercentage: 0,
   };
 
-  const baseFeeOption = {
+  const baseFee = {
     baseFeeMode: 0,
     cliffFeeNumerator: new BN(10_000_000), // 1% (denom = 1e9)
     firstFactor: 0,
@@ -90,19 +110,43 @@ async function main() {
     thirdFactor: new BN(0),
   };
 
-  const instructionParams = designCurve(
+  // designCurve(pct-on-migration, fixed threshold) caps ~200k COOK — not enough for 1M.
+  // designGraphCurve picks sqrt-price ladder from market caps; tuned per-preset for target
+  // graduation quote while keeping exact 1B mint. Picked from GRAD_PRESETS above.
+  const INITIAL_MARKET_CAP_COOK = preset.init;
+  const MIGRATION_MARKET_CAP_COOK = preset.mig;
+  const CURVE_K_FACTOR = preset.k;
+  const LEFTOVER_TOKENS = preset.leftOver; // human units, not on curve (precision buffer)
+
+  const instructionParams = designGraphCurve(
     TOTAL_SUPPLY,
-    PCT_ON_MIGRATION,
-    MIGRATION_QUOTE_THRESHOLD,
+    INITIAL_MARKET_CAP_COOK,
+    MIGRATION_MARKET_CAP_COOK,
     MIGRATION_OPTION,
     TOKEN_BASE_DECIMAL,
     TOKEN_QUOTE_DECIMAL,
     CREATOR_TRADING_FEE_PCT,
     COLLECT_FEE_MODE,
     lockedVesting,
-    migrationFee,
-    { baseFeeOption }
+    LEFTOVER_TOKENS,
+    CURVE_K_FACTOR,
+    baseFee
   );
+
+  const thresholdCook =
+    Number(instructionParams.migrationQuoteThreshold.toString()) / 10 ** TOKEN_QUOTE_DECIMAL;
+  console.log(
+    "Computed migrationQuoteThreshold:",
+    thresholdCook.toLocaleString(),
+    "COOK (target",
+    MIGRATION_QUOTE_THRESHOLD.toLocaleString(),
+    ")"
+  );
+
+  instructionParams.tokenSupply = {
+    preMigrationTokenSupply: FIXED_TOKEN_SUPPLY_RAW,
+    postMigrationTokenSupply: FIXED_TOKEN_SUPPLY_RAW,
+  };
 
   instructionParams.migrationFeeOption = MIGRATION_FEE_OPTION;
 
