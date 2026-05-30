@@ -19,7 +19,7 @@ import path from "path";
 
 import idl from "../target/idl/dynamic_bonding_curve.json";
 import type { DynamicBondingCurve } from "../target/types/dynamic_bonding_curve";
-import { designGraphCurve } from "../tests/utils/create_curve";
+import { designCurve, designGraphCurve } from "../tests/utils/create_curve";
 
 const PROGRAM_ID = new PublicKey(
   "DBCg4ugDEztk6MbqHEJvx5a5YGJTj45Jb5NvtQ48Rvsf"
@@ -50,15 +50,21 @@ async function main() {
 
   // pump.fun-style defaults
   const TOTAL_SUPPLY = 1_000_000_000; // curve math (1B)
-  // Bucket presets: each yields ~target COOK graduation with exact 1B supply (sim-verified).
-  // Override via `TARGET_GRAD_COOK=500000` env var. Default = 1M.
-  const GRAD_PRESETS: Record<number, { init: number; mig: number; k: number; leftOver: number }> = {
-    1_000_000: { init: 3_000, mig: 126_750_000, k: 1.05, leftOver: 1_000 }, // -> 999,714.9 COOK
-    500_000:   { init: 2_000, mig:  58_524_453, k: 1.04, leftOver: 1_000 }, // -> 499,999.9999 COOK
-    200_000:   { init:   300, mig:  70_727_256, k: 1.03, leftOver: 1_000 }, // -> 200,000.032 COOK
-    100_000:   { init:   150, mig:  35_363_627, k: 1.03, leftOver: 1_000 }, // -> 100,000.014 COOK
-    50_000:    { init:    80, mig:  13_613_226, k: 1.04, leftOver: 1_000 }, // -> 49,999.999 COOK
-    10_000:    { init:    30, mig:   1_268_185, k: 1.05, leftOver: 1_000 }, // -> 9,999.998 COOK
+  // Bucket presets — match deployed on-chain configs. Two design methods:
+  //   'curve' = designCurve pct=21 (Uniswap V2 / pump.fun-exact). Used for 10K/100K/200K.
+  //              Note: 50K with curve pct=21 hits BN precision in on-chain validator
+  //              (InvalidTokenSupply error 6020). 50K tier dropped from ladder.
+  //   'graph' = designGraphCurve. Used for 1M (designCurve caps at ~200K threshold).
+  // All deployed configs give pump.fun-shaped distribution (2.89-3.23% supply @ 1% grad,
+  // FDV/grad 4.76-5.14×, ~13-16× ROI on 5% pre-buy held to grad).
+  // Override via `TARGET_GRAD_COOK=N` env var. Default = 1M.
+  type GraphPreset = { method: "graph"; init: number; mig: number; k: number; leftOver: number };
+  type CurvePreset = { method: "curve"; pct: number };
+  const GRAD_PRESETS: Record<number, GraphPreset | CurvePreset> = {
+    1_000_000: { method: "graph", init: 300_000, mig: 5_153_211, k: 1.0, leftOver: 1_000 }, // 3.23% supply @ 1% grad, FDV/grad 5.14×
+    200_000:   { method: "curve", pct: 21 }, // 2.89% supply @ 1% grad, FDV/grad 4.76× (pump.fun-exact)
+    100_000:   { method: "curve", pct: 21 }, // 2.89% supply @ 1% grad, FDV/grad 4.76×
+    10_000:    { method: "curve", pct: 21 }, // 2.89% supply @ 1% grad, FDV/grad 4.76×
   };
   const TARGET_GRAD_COOK = Number(process.env.TARGET_GRAD_COOK ?? 1_000_000);
   const preset = GRAD_PRESETS[TARGET_GRAD_COOK];
@@ -68,7 +74,7 @@ async function main() {
       `Sim-verify a new param tuple first, then add it to GRAD_PRESETS.`
     );
   }
-  const MIGRATION_QUOTE_THRESHOLD = TARGET_GRAD_COOK; // target graduation quote (designGraphCurve ~matches)
+  const MIGRATION_QUOTE_THRESHOLD = TARGET_GRAD_COOK; // target graduation quote
   const MIGRATION_OPTION = 1;          // 0 = MeteoraDamm, 1 = DammV2
   const TOKEN_BASE_DECIMAL = 6;
   const TOKEN_QUOTE_DECIMAL = 9;
@@ -110,28 +116,35 @@ async function main() {
     thirdFactor: new BN(0),
   };
 
-  // designCurve(pct-on-migration, fixed threshold) caps ~200k COOK — not enough for 1M.
-  // designGraphCurve picks sqrt-price ladder from market caps; tuned per-preset for target
-  // graduation quote while keeping exact 1B mint. Picked from GRAD_PRESETS above.
-  const INITIAL_MARKET_CAP_COOK = preset.init;
-  const MIGRATION_MARKET_CAP_COOK = preset.mig;
-  const CURVE_K_FACTOR = preset.k;
-  const LEFTOVER_TOKENS = preset.leftOver; // human units, not on curve (precision buffer)
-
-  const instructionParams = designGraphCurve(
-    TOTAL_SUPPLY,
-    INITIAL_MARKET_CAP_COOK,
-    MIGRATION_MARKET_CAP_COOK,
-    MIGRATION_OPTION,
-    TOKEN_BASE_DECIMAL,
-    TOKEN_QUOTE_DECIMAL,
-    CREATOR_TRADING_FEE_PCT,
-    COLLECT_FEE_MODE,
-    lockedVesting,
-    LEFTOVER_TOKENS,
-    CURVE_K_FACTOR,
-    baseFee
-  );
+  const instructionParams =
+    preset.method === "curve"
+      ? designCurve(
+          TOTAL_SUPPLY,
+          preset.pct,
+          MIGRATION_QUOTE_THRESHOLD,
+          MIGRATION_OPTION,
+          TOKEN_BASE_DECIMAL,
+          TOKEN_QUOTE_DECIMAL,
+          CREATOR_TRADING_FEE_PCT,
+          COLLECT_FEE_MODE,
+          lockedVesting,
+          migrationFee,
+          { baseFeeOption: baseFee }
+        )
+      : designGraphCurve(
+          TOTAL_SUPPLY,
+          preset.init,
+          preset.mig,
+          MIGRATION_OPTION,
+          TOKEN_BASE_DECIMAL,
+          TOKEN_QUOTE_DECIMAL,
+          CREATOR_TRADING_FEE_PCT,
+          COLLECT_FEE_MODE,
+          lockedVesting,
+          preset.leftOver,
+          preset.k,
+          baseFee
+        );
 
   const thresholdCook =
     Number(instructionParams.migrationQuoteThreshold.toString()) / 10 ** TOKEN_QUOTE_DECIMAL;
