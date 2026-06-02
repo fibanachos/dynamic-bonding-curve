@@ -163,6 +163,13 @@ async function main() {
 
   instructionParams.migrationFeeOption = MIGRATION_FEE_OPTION;
 
+  // Token metadata update authority (TokenAuthorityOption):
+  //   0 = CreatorUpdateAuthority, 1 = Immutable, 2 = PartnerUpdateAuthority,
+  //   3 = CreatorUpdateAndMintAuthority, 4 = PartnerUpdateAndMintAuthority.
+  // 2 = partner (= feeClaimer = admin wallet below) can update name/ticker/URI
+  // post-launch, but cannot mint supply or freeze accounts.
+  instructionParams.tokenUpdateAuthority = 2;
+
   if (instructionParams.migratedPoolMarketCapFeeSchedulerParams == null) {
     instructionParams.migratedPoolMarketCapFeeSchedulerParams = {
       numberOfPeriod: 0,
@@ -211,7 +218,7 @@ async function main() {
   console.log("Tx:", sig);
   console.log("");
   console.log("DBC_CONFIG =", config.publicKey.toBase58());
-  console.log("Paste this into cookieora/src/components/bonding/LaunchTokenPage.tsx");
+  console.log("Paste this into cookiebox/src/solana/bonding/dbcConfigs.ts");
 }
 
 main().catch((e) => {
