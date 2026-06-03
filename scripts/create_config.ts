@@ -166,9 +166,14 @@ async function main() {
   // Token metadata update authority (TokenAuthorityOption):
   //   0 = CreatorUpdateAuthority, 1 = Immutable, 2 = PartnerUpdateAuthority,
   //   3 = CreatorUpdateAndMintAuthority, 4 = PartnerUpdateAndMintAuthority.
+
   // 2 = partner (= feeClaimer = admin wallet below) can update name/ticker/URI
   // post-launch, but cannot mint supply or freeze accounts.
-  instructionParams.tokenUpdateAuthority = 2;
+  // instructionParams.tokenUpdateAuthority = 2;
+
+  // 1 = Immutable: token metadata (name/ticker/URI) can never be updated
+  // post-launch, and no one can mint supply or freeze accounts.
+  instructionParams.tokenUpdateAuthority = 1;
 
   if (instructionParams.migratedPoolMarketCapFeeSchedulerParams == null) {
     instructionParams.migratedPoolMarketCapFeeSchedulerParams = {
