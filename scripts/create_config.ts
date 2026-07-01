@@ -84,6 +84,16 @@ async function main() {
   const CREATOR_TRADING_FEE_PCT = 50;  // 50% of trading fee to token creator
   const COLLECT_FEE_MODE = 0;          // 0 = QuoteToken only
 
+  // Post-migration locked-LP split (percent of migrated liquidity). The migrated
+  // DAMM v2 pool charges 0.25% per swap, shared among LP holders by liquidity share,
+  // so the creator's ongoing fee income ≈ CREATOR_LOCKED_LP_PCT * 0.25% of volume.
+  // 30% ≈ 0.075% of volume — roughly Pump.fun's steady-state creator floor (~0.05%),
+  // with headroom for dilution as outside LPs deposit. Permanent-locked = principal
+  // never withdrawable (Pump.fun-like: creator gets the fee stream, not the LP).
+  // Was creator 0 / partner 100 (all post-migration fees to the admin/fee_claimer).
+  const CREATOR_LOCKED_LP_PCT = Number(process.env.CREATOR_LOCKED_LP_PCT ?? 30);
+  const PARTNER_LOCKED_LP_PCT = 100 - CREATOR_LOCKED_LP_PCT;
+
   // Selects which pre-deployed DAMM v2 pool config receives migrated liquidity.
   // Cookie Chain mapping (post-migration LP fee on the DAMM v2 pool):
   //   0 = 0.25%  BgKTpMWBiSfdnxr8K6FmKsjV8LXpWZiS4a2xHk3M6Ymy
@@ -162,6 +172,14 @@ async function main() {
   };
 
   instructionParams.migrationFeeOption = MIGRATION_FEE_OPTION;
+
+  // Give the token creator a permanent-locked share of the migrated LP so they keep
+  // earning post-migration trading fees (see CREATOR_LOCKED_LP_PCT above). Unlocked
+  // and vesting stay 0 — the full pool remains locked, only the fee split changes.
+  instructionParams.creatorPermanentLockedLiquidityPercentage = CREATOR_LOCKED_LP_PCT;
+  instructionParams.partnerPermanentLockedLiquidityPercentage = PARTNER_LOCKED_LP_PCT;
+  instructionParams.creatorLiquidityPercentage = 0;
+  instructionParams.partnerLiquidityPercentage = 0;
 
   // Token metadata update authority (TokenAuthorityOption):
   //   0 = CreatorUpdateAuthority, 1 = Immutable, 2 = PartnerUpdateAuthority,
